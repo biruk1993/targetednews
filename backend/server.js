@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const Parser = require('rss-parser');
 const http = require('http');
 const socketIo = require('socket.io');
 const sqlite3 = require('sqlite3').verbose();
@@ -18,9 +17,6 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 
-// Initialize RSS Parser (keeping for backup)
-const parser = new Parser();
-
 // Database setup - FIXED PATH
 const dbPath = path.join(__dirname, 'news.db');
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -29,11 +25,10 @@ const db = new sqlite3.Database(dbPath, (err) => {
   } else {
     console.log('✅ Connected to SQLite database:', dbPath);
     initializeDatabase();
-    autoInitializeSources(); // AUTO-INITIALIZE ON STARTUP
   }
 });
 
-// Create tables - FIXED ORDER
+// Create tables - FIXED ORDER with callbacks
 function initializeDatabase() {
   // Create countries table first
   db.run(`CREATE TABLE IF NOT EXISTS countries (
@@ -47,46 +42,51 @@ function initializeDatabase() {
       console.error('Error creating countries table:', err);
     } else {
       console.log('✅ Countries table ready');
-      insertCountries();
-    }
-  });
-
-  // Then create news_sources table
-  db.run(`CREATE TABLE IF NOT EXISTS news_sources (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    country_code TEXT NOT NULL,
-    rss_url TEXT NOT NULL,
-    source_name TEXT,
-    is_active BOOLEAN DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`, (err) => {
-    if (err) {
-      console.error('Error creating news_sources table:', err);
-    } else {
-      console.log('✅ News sources table ready');
-    }
-  });
-
-  // Finally create news_articles table
-  db.run(`CREATE TABLE IF NOT EXISTS news_articles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_id INTEGER,
-    country_code TEXT NOT NULL,
-    title TEXT NOT NULL,
-    description TEXT,
-    link TEXT UNIQUE,
-    pub_date DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`, (err) => {
-    if (err) {
-      console.error('Error creating news_articles table:', err);
-    } else {
-      console.log('✅ News articles table ready');
+      
+      // Then create news_sources table
+      db.run(`CREATE TABLE IF NOT EXISTS news_sources (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        country_code TEXT NOT NULL,
+        rss_url TEXT NOT NULL,
+        source_name TEXT,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`, (err) => {
+        if (err) {
+          console.error('Error creating news_sources table:', err);
+        } else {
+          console.log('✅ News sources table ready');
+          
+          // Finally create news_articles table
+          db.run(`CREATE TABLE IF NOT EXISTS news_articles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_id INTEGER,
+            country_code TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            link TEXT UNIQUE,
+            pub_date DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          )`, (err) => {
+            if (err) {
+              console.error('Error creating news_articles table:', err);
+            } else {
+              console.log('✅ News articles table ready');
+              
+              // NOW initialize everything
+              insertCountries();
+              setTimeout(() => {
+                autoInitializeSources();
+              }, 1000);
+            }
+          });
+        }
+      });
     }
   });
 }
 
-// Insert countries - SEPARATE FUNCTION
+// Insert countries
 function insertCountries() {
   const countries = [
     { name: 'Eritrea', code: 'eritrea', flag_emoji: '🇪🇷' },
@@ -127,20 +127,16 @@ function autoInitializeSources() {
       initializeDefaultSources();
     } else {
       console.log(`✅ Database has ${row.count} sources already`);
-      // Auto-fetch news if sources exist but no articles
-      db.get('SELECT COUNT(*) as count FROM news_articles', (err, articleRow) => {
-        if (!err && articleRow.count === 0) {
-          console.log('🔄 No articles found - auto-fetching news...');
-          setTimeout(() => {
-            NewsFetcher.fetchAllNews();
-          }, 5000);
-        }
-      });
+      // Auto-fetch news
+      setTimeout(() => {
+        console.log('🔄 Auto-fetching news from NewsAPI...');
+        NewsFetcher.fetchAllNews();
+      }, 5000);
     }
   });
 }
 
-// Initialize default sources (minimal - just for admin panel)
+// Initialize default sources
 function initializeDefaultSources() {
   const workingSources = [
     { country_code: 'eritrea', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Eritrea' },
@@ -163,10 +159,9 @@ function initializeDefaultSources() {
           added++;
         }
         
-        // Auto-fetch news after adding all sources
         if (index === workingSources.length - 1) {
           console.log(`🎉 Auto-initialized ${added} sources`);
-          // Auto-fetch news after 10 seconds
+          // Auto-fetch news
           setTimeout(() => {
             console.log('🔄 Auto-fetching news from NewsAPI...');
             NewsFetcher.fetchAllNews();
@@ -177,7 +172,7 @@ function initializeDefaultSources() {
   });
 }
 
-// News Fetcher Service with NewsAPI
+// News Fetcher Service with NewsAPI - DEBUG VERSION
 class NewsFetcher {
   static async fetchAllNews() {
     try {
@@ -195,9 +190,8 @@ class NewsFetcher {
 
       for (const [countryCode, newsApiCode] of Object.entries(countries)) {
         try {
-          console.log(`🔍 Fetching news for: ${countryCode}`);
+          console.log(`🔍 Fetching news for: ${countryCode} (${newsApiCode})`);
           
-          // Use NewsAPI instead of RSS
           const articles = await this.fetchFromNewsAPI(newsApiCode, countryCode);
           await this.saveArticles(articles);
           totalArticles += articles.length;
@@ -219,16 +213,24 @@ class NewsFetcher {
   }
 
   static async fetchFromNewsAPI(countryCode, countryName) {
-    const NEWS_API_KEY = '29ceab457b534b79a5732233a6b95fcd'; // Your API key
-    const url = `https://newsapi.org/v2/top-headlines?country=${countryCode}&pageSize=15&apiKey=${NEWS_API_KEY}`;
+    const NEWS_API_KEY = '29ceab457b534b79a5732233a6b95fcd';
+    const url = `https://newsapi.org/v2/top-headlines?country=${countryCode}&pageSize=10&apiKey=${NEWS_API_KEY}`;
+    
+    console.log(`🌐 Calling NewsAPI: ${url}`);
     
     try {
       const response = await fetch(url);
       const data = await response.json();
       
+      console.log(`📊 NewsAPI response for ${countryCode}:`, {
+        status: data.status,
+        totalResults: data.totalResults,
+        articles: data.articles ? data.articles.length : 0
+      });
+      
       if (data.status === 'ok' && data.articles && data.articles.length > 0) {
         return data.articles.map(article => ({
-          source_id: 1, // Default source ID
+          source_id: 1,
           country_code: countryName,
           title: article.title || 'No title available',
           description: article.description || 'No description available',
@@ -237,11 +239,11 @@ class NewsFetcher {
           source_name: article.source?.name || 'NewsAPI'
         }));
       } else {
-        console.log(`No articles found for ${countryCode} or API error`);
+        console.log(`❌ NewsAPI returned no articles for ${countryCode}:`, data);
         return [];
       }
     } catch (error) {
-      console.log(`NewsAPI error for ${countryCode}:`, error.message);
+      console.log(`❌ NewsAPI error for ${countryCode}:`, error.message);
       return [];
     }
   }
@@ -307,15 +309,15 @@ class NewsFetcher {
   }
 }
 
-// Auto-refresh news every 30 minutes (NewsAPI has 100 requests/day limit)
+// Auto-refresh news every 30 minutes
 const AutoRefresh = {
   start() {
-    // Initial fetch after 30 seconds (let auto-init complete first)
+    // Initial fetch after 60 seconds
     setTimeout(() => {
       this.fetchAllNews();
-    }, 30000);
+    }, 60000);
     
-    // Then fetch every 30 minutes to stay within free limits
+    // Then fetch every 30 minutes
     setInterval(() => {
       this.fetchAllNews();
     }, 30 * 60 * 1000);
@@ -326,7 +328,6 @@ const AutoRefresh = {
       console.log('🔄 Auto-refreshing news from NewsAPI...');
       const count = await NewsFetcher.fetchAllNews();
       
-      // Notify all connected clients
       io.emit('news_updated', {
         timestamp: new Date(),
         message: `Auto-refresh: ${count} new articles processed`,
@@ -342,7 +343,6 @@ const AutoRefresh = {
 
 // ==================== API ROUTES ====================
 
-// Test route
 app.get('/', (req, res) => {
   res.json({ 
     message: '🎯 TargetedNews API is running!',
@@ -353,8 +353,26 @@ app.get('/', (req, res) => {
       news: '/api/news/:countryCode',
       fetchNews: '/api/fetch-news',
       admin_sources: '/admin/sources',
-      init_sources: '/api/init-sources'
+      init_sources: '/api/init-sources',
+      debug: '/api/debug'
     }
+  });
+});
+
+// Debug endpoint to check database status
+app.get('/api/debug', (req, res) => {
+  Promise.all([
+    new Promise((resolve) => db.get('SELECT COUNT(*) as count FROM countries', (err, row) => resolve(row))),
+    new Promise((resolve) => db.get('SELECT COUNT(*) as count FROM news_sources', (err, row) => resolve(row))),
+    new Promise((resolve) => db.get('SELECT COUNT(*) as count FROM news_articles', (err, row) => resolve(row)))
+  ]).then(([countries, sources, articles]) => {
+    res.json({
+      database_status: 'OK',
+      countries: countries.count,
+      sources: sources.count,
+      articles: articles.count,
+      timestamp: new Date().toISOString()
+    });
   });
 });
 
@@ -386,48 +404,6 @@ app.get('/api/countries-with-news', (req, res) => {
   });
 });
 
-// Initialize RSS sources (for admin panel)
-app.get('/api/init-sources', (req, res) => {
-  const workingSources = [
-    { country_code: 'eritrea', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Eritrea' },
-    { country_code: 'somalia', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Somalia' },
-    { country_code: 'sudan', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Sudan' },
-    { country_code: 'kenya', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Kenya' },
-    { country_code: 'egypt', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Egypt' }
-  ];
-
-  let added = 0;
-  let errors = 0;
-
-  // Add each source
-  workingSources.forEach((source, index) => {
-    db.run(
-      `INSERT OR IGNORE INTO news_sources (country_code, rss_url, source_name) VALUES (?, ?, ?)`,
-      [source.country_code, source.rss_url, source.source_name],
-      function(err) {
-        if (err) {
-          console.error(`Failed: ${source.source_name} - ${err.message}`);
-          errors++;
-        } else {
-          console.log(`Added: ${source.source_name}`);
-          added++;
-        }
-        
-        // When all sources are processed
-        if (index === workingSources.length - 1) {
-          res.json({
-            success: true,
-            message: `Added ${added} sources, ${errors} errors`,
-            added: added,
-            errors: errors,
-            developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe'
-          });
-        }
-      }
-    );
-  });
-});
-
 // Fetch and update all news
 app.get('/api/fetch-news', async (req, res) => {
   try {
@@ -435,8 +411,7 @@ app.get('/api/fetch-news', async (req, res) => {
     res.json({
       success: true,
       message: `Successfully processed ${count} articles from NewsAPI`,
-      count: count,
-      developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe'
+      count: count
     });
   } catch (error) {
     res.status(500).json({
@@ -456,8 +431,7 @@ app.get('/api/news/:countryCode', async (req, res) => {
       success: true,
       country: countryCode,
       articles: news,
-      count: news.length,
-      developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe'
+      count: news.length
     });
   } catch (error) {
     res.status(500).json({
@@ -465,97 +439,6 @@ app.get('/api/news/:countryCode', async (req, res) => {
       error: error.message
     });
   }
-});
-
-// Admin: Add RSS source
-app.post('/admin/sources', (req, res) => {
-  const { country_code, rss_url, source_name } = req.body;
-  
-  console.log('Adding source:', { country_code, rss_url, source_name });
-  
-  if (!country_code || !rss_url) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Country code and RSS URL are required' 
-    });
-  }
-  
-  db.run(
-    `INSERT OR IGNORE INTO news_sources (country_code, rss_url, source_name) 
-     VALUES (?, ?, ?)`,
-    [country_code, rss_url, source_name || 'Unknown Source'],
-    function(err) {
-      if (err) {
-        console.error('Database error:', err);
-        res.status(500).json({ success: false, error: err.message });
-      } else {
-        console.log('Source added successfully, ID:', this.lastID);
-        res.json({ 
-          success: true, 
-          message: 'Source added successfully',
-          id: this.lastID,
-          developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe'
-        });
-      }
-    }
-  );
-});
-
-// Admin: Get all sources
-app.get('/admin/sources', (req, res) => {
-  db.all(
-    `SELECT ns.*, c.name as country_name, c.flag_emoji
-     FROM news_sources ns 
-     JOIN countries c ON ns.country_code = c.code 
-     ORDER BY c.name, ns.source_name`,
-    (err, rows) => {
-      if (err) {
-        res.status(500).json({ error: err.message });
-      } else {
-        res.json(rows);
-      }
-    }
-  );
-});
-
-// Admin: Delete RSS source
-app.delete('/admin/sources/:sourceId', (req, res) => {
-  const sourceId = req.params.sourceId;
-  
-  console.log('Deleting source ID:', sourceId);
-  
-  if (!sourceId) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Source ID is required' 
-    });
-  }
-  
-  db.run(
-    `DELETE FROM news_sources WHERE id = ?`,
-    [sourceId],
-    function(err) {
-      if (err) {
-        console.error('Database error:', err);
-        res.status(500).json({ success: false, error: err.message });
-      } else {
-        if (this.changes === 0) {
-          res.status(404).json({ 
-            success: false, 
-            error: 'Source not found' 
-          });
-        } else {
-          console.log('Source deleted successfully');
-          res.json({ 
-            success: true, 
-            message: 'Source deleted successfully',
-            changes: this.changes,
-            developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe'
-          });
-        }
-      }
-    }
-  );
 });
 
 // Start server
@@ -569,7 +452,9 @@ server.listen(PORT, () => {
 });
 
 // Start auto-refresh when server starts
-AutoRefresh.start();
+setTimeout(() => {
+  AutoRefresh.start();
+}, 5000);
 
 // WebSocket for real-time updates
 io.on('connection', (socket) => {
@@ -580,5 +465,4 @@ io.on('connection', (socket) => {
   });
 });
 
-// Export for testing
-module.exports = { app, db, parser, io };
+module.exports = { app, db };
