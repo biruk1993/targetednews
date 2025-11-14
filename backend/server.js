@@ -29,6 +29,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
   } else {
     console.log('✅ Connected to SQLite database:', dbPath);
     initializeDatabase();
+    autoInitializeSources(); // AUTO-INITIALIZE ON STARTUP
   }
 });
 
@@ -106,6 +107,83 @@ function insertCountries() {
           if (this.changes > 0) {
             console.log(`✅ Added country: ${country.name}`);
           }
+        }
+      }
+    );
+  });
+}
+
+// Auto-initialize sources if database is empty
+function autoInitializeSources() {
+  // Check if sources table is empty
+  db.get('SELECT COUNT(*) as count FROM news_sources', (err, row) => {
+    if (err) {
+      console.error('Error checking sources:', err);
+      return;
+    }
+    
+    if (row.count === 0) {
+      console.log('🔄 Database empty - auto-initializing sources...');
+      initializeDefaultSources();
+    } else {
+      console.log(`✅ Database has ${row.count} sources already`);
+      // Auto-fetch news if sources exist but no articles
+      db.get('SELECT COUNT(*) as count FROM news_articles', (err, articleRow) => {
+        if (!err && articleRow.count === 0) {
+          console.log('🔄 No articles found - auto-fetching news...');
+          setTimeout(() => {
+            NewsFetcher.fetchAllNews();
+          }, 5000);
+        }
+      });
+    }
+  });
+}
+
+// Initialize default RSS sources
+function initializeDefaultSources() {
+  const workingSources = [
+    // Eritrea
+    { country_code: 'eritrea', rss_url: 'http://www.shabait.com/feed', source_name: 'Shabait Eritrea' },
+    { country_code: 'eritrea', rss_url: 'https://allafrica.com/tools/headlines/rdf/eritrea/headlines.rdf', source_name: 'AllAfrica Eritrea' },
+    
+    // Somalia
+    { country_code: 'somalia', rss_url: 'https://allafrica.com/tools/headlines/rdf/somalia/headlines.rdf', source_name: 'AllAfrica Somalia' },
+    
+    // Sudan
+    { country_code: 'sudan', rss_url: 'https://allafrica.com/tools/headlines/rdf/sudan/headlines.rdf', source_name: 'AllAfrica Sudan' },
+    { country_code: 'sudan', rss_url: 'https://sudanow-magazine.net/feed', source_name: 'Sudanow Magazine' },
+    
+    // Kenya
+    { country_code: 'kenya', rss_url: 'https://allafrica.com/tools/headlines/rdf/kenya/headlines.rdf', source_name: 'AllAfrica Kenya' },
+    { country_code: 'kenya', rss_url: 'https://www.the-star.co.ke/rss', source_name: 'The Star Kenya' },
+    
+    // Egypt
+    { country_code: 'egypt', rss_url: 'https://allafrica.com/tools/headlines/rdf/egypt/headlines.rdf', source_name: 'AllAfrica Egypt' },
+    { country_code: 'egypt', rss_url: 'https://www.dailynewsegypt.com/feed/', source_name: 'Daily News Egypt' }
+  ];
+
+  let added = 0;
+  workingSources.forEach((source, index) => {
+    db.run(
+      `INSERT OR IGNORE INTO news_sources (country_code, rss_url, source_name) VALUES (?, ?, ?)`,
+      [source.country_code, source.rss_url, source.source_name],
+      function(err) {
+        if (err) {
+          console.error(`❌ Failed to add ${source.source_name}:`, err.message);
+        } else {
+          console.log(`✅ Auto-added: ${source.source_name}`);
+          added++;
+        }
+        
+        // Auto-fetch news after adding all sources
+        if (index === workingSources.length - 1) {
+          console.log(`🎉 Auto-initialized ${added} RSS sources`);
+          // Auto-fetch news after 10 seconds
+          setTimeout(() => {
+            console.log('🔄 Auto-fetching news after source initialization...');
+            NewsFetcher.fetchAllNews();
+          }, 10000);
         }
       }
     );
@@ -232,10 +310,10 @@ class NewsFetcher {
 // Auto-refresh news every 10 minutes
 const AutoRefresh = {
   start() {
-    // Initial fetch
+    // Initial fetch after 30 seconds (let auto-init complete first)
     setTimeout(() => {
       this.fetchAllNews();
-    }, 5000); // Wait 5 seconds after server start
+    }, 30000);
     
     // Then fetch every 10 minutes
     setInterval(() => {
@@ -268,6 +346,7 @@ const AutoRefresh = {
 app.get('/', (req, res) => {
   res.json({ 
     message: '🎯 TargetedNews API is running!',
+    developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe',
     endpoints: {
       countries: '/api/countries',
       news: '/api/news/:countryCode',
@@ -352,7 +431,8 @@ app.get('/api/init-sources', (req, res) => {
             success: true,
             message: `Added ${added} sources, ${errors} errors`,
             added: added,
-            errors: errors
+            errors: errors,
+            developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe'
           });
         }
       }
@@ -367,7 +447,8 @@ app.get('/api/fetch-news', async (req, res) => {
     res.json({
       success: true,
       message: `Successfully processed ${count} articles`,
-      count: count
+      count: count,
+      developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe'
     });
   } catch (error) {
     res.status(500).json({
@@ -387,7 +468,8 @@ app.get('/api/news/:countryCode', async (req, res) => {
       success: true,
       country: countryCode,
       articles: news,
-      count: news.length
+      count: news.length,
+      developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe'
     });
   } catch (error) {
     res.status(500).json({
@@ -423,7 +505,8 @@ app.post('/admin/sources', (req, res) => {
         res.json({ 
           success: true, 
           message: 'Source added successfully',
-          id: this.lastID 
+          id: this.lastID,
+          developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe'
         });
       }
     }
@@ -478,7 +561,8 @@ app.delete('/admin/sources/:sourceId', (req, res) => {
           res.json({ 
             success: true, 
             message: 'Source deleted successfully',
-            changes: this.changes
+            changes: this.changes,
+            developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe'
           });
         }
       }
@@ -491,6 +575,8 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 TargetedNews Backend Active!`);
+  console.log(`👨‍💻 Developer: Second Lieutenant Biruk Zenebe`);
+  console.log(`🏢 Ethiopian Electronic Warfare Department`);
 });
 
 // Start auto-refresh when server starts
