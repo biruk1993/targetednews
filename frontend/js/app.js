@@ -1,7 +1,6 @@
 // Use environment variable or default to localhost for development
-const API_BASE = window.location.hostname === 'localhost' 
-  ? 'http://localhost:3001/api' 
-  : 'https://your-backend-url.railway.app/api';
+const API_BASE = 'https://targetednews-backend.onrender.com/api';
+const SOCKET_URL = 'https://targetednews-backend.onrender.com';
 
 const SOCKET_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:3001'
