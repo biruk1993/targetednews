@@ -2,10 +2,6 @@
 const API_BASE = 'https://targetednews-backend.onrender.com/api';
 const SOCKET_URL = 'https://targetednews-backend.onrender.com';
 
-const SOCKET_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:3001'
-  : 'https://your-backend-url.railway.app';
-
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
     loadCountries();
