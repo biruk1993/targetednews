@@ -1,4 +1,4 @@
-// Use environment variable or default to localhost for development
+// Simple production URL
 const API_BASE = 'https://targetednews-backend.onrender.com/api';
 const SOCKET_URL = 'https://targetednews-backend.onrender.com';
 
@@ -150,7 +150,7 @@ async function fetchAllNews() {
 
 async function viewSources() {
     try {
-        const response = await fetch('http://localhost:3001/admin/sources');
+        const response = await fetch(`${API_BASE.replace('/api', '')}/admin/sources`);
         const sources = await response.json();
         
         const adminContent = document.getElementById('admin-content');
@@ -158,7 +158,7 @@ async function viewSources() {
             <h4>Current RSS Sources (${sources.length})</h4>
             <div style="max-height: 400px; overflow-y: auto; margin-top: 1rem;">
                 ${sources.length === 0 ? 
-                    '<p>No sources added yet. Add some using the form below.</p>' : 
+                    '<p>No sources added yet. <button onclick="initSources()" class="btn" style="background: #27ae60; margin-top: 0.5rem;">Initialize Sources</button></p>' : 
                     sources.map(source => `
                     <div style="border: 1px solid #444; padding: 1rem; margin: 0.5rem 0; border-radius: 5px; background: #2d2d2d;">
                         <div style="display: flex; justify-content: space-between; align-items: start;">
@@ -179,7 +179,25 @@ async function viewSources() {
         `;
     } catch (error) {
         console.error('Error loading sources:', error);
-        document.getElementById('admin-content').innerHTML = '<p>Error loading sources</p>';
+        document.getElementById('admin-content').innerHTML = '<p>Error loading sources. <button onclick="initSources()" class="btn" style="background: #27ae60;">Initialize Sources</button></p>';
+    }
+}
+
+// Initialize sources
+async function initSources() {
+    try {
+        const response = await fetch(`${API_BASE}/init-sources`);
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ Sources initialized! ${data.message}`);
+            viewSources(); // Refresh the sources list
+        } else {
+            alert(`❌ Error: ${data.error}`);
+        }
+    } catch (error) {
+        console.error('Error initializing sources:', error);
+        alert('❌ Network error initializing sources');
     }
 }
 
@@ -190,7 +208,7 @@ async function deleteSource(sourceId, sourceName) {
     }
     
     try {
-        const response = await fetch(`http://localhost:3001/admin/sources/${sourceId}`, {
+        const response = await fetch(`${API_BASE.replace('/api', '')}/admin/sources/${sourceId}`, {
             method: 'DELETE'
         });
         
@@ -245,7 +263,7 @@ async function addNewSource() {
     try {
         resultDiv.innerHTML = '<p>Adding source...</p>';
         
-        const response = await fetch('http://localhost:3001/admin/sources', {
+        const response = await fetch(`${API_BASE.replace('/api', '')}/admin/sources`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
