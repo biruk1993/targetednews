@@ -1,0 +1,396 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #e0e0e0;
+    background: #121212;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Header */
+header {
+    background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+    color: #ffffff;
+    padding: 2rem 0;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    border-bottom: 1px solid #333;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+header p {
+    font-size: 1.1rem;
+    opacity: 0.8;
+}
+
+/* Country Grid */
+.countries-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.country-card {
+    background: linear-gradient(135deg, #2d2d2d, #3d3d3d);
+    border: none;
+    border-radius: 15px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #444;
+}
+
+.country-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.country-card:hover {
+    transform: translateY(-8px) scale(1.05);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+}
+
+.country-card:hover::before {
+    opacity: 1;
+}
+
+/* Country-specific flag backgrounds */
+.country-card[data-country="eritrea"] { background: linear-gradient(135deg, #3c8dbc, #2c3e50); }
+.country-card[data-country="somalia"] { background: linear-gradient(135deg, #6ab04c, #badc58); }
+.country-card[data-country="sudan"] { background: linear-gradient(135deg, #d63031, #e17055); }
+.country-card[data-country="kenya"] { background: linear-gradient(135deg, #fdcb6e, #e17055); }
+.country-card[data-country="egypt"] { background: linear-gradient(135deg, #c23616, #e1b12c); }
+
+.country-flag {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.country-name {
+    font-size: 1.3rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #ffffff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.article-count {
+    color: #b0b0b0;
+    font-size: 0.9rem;
+    background: rgba(0,0,0,0.3);
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    display: inline-block;
+}
+
+/* News Display */
+.news-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #333;
+}
+
+.back-btn {
+    background: linear-gradient(135deg, #6c757d, #5a6268);
+    color: white;
+    border: none;
+    padding: 0.7rem 1.2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+}
+
+.back-btn:hover {
+    background: linear-gradient(135deg, #5a6268, #495057);
+    transform: translateX(-3px);
+}
+
+.news-count {
+    color: #888;
+    font-style: italic;
+    background: #2d2d2d;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+}
+
+.news-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.news-article {
+    background: linear-gradient(135deg, #2d2d2d, #3d3d3d);
+    border-radius: 12px;
+    padding: 1.8rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+    border: 1px solid #444;
+    position: relative;
+    overflow: hidden;
+}
+
+.news-article::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+}
+
+.news-article:hover {
+    transform: translateX(8px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+
+.article-title {
+    font-size: 1.3rem;
+    font-weight: bold;
+    margin-bottom: 0.8rem;
+    color: #ffffff;
+    line-height: 1.4;
+}
+
+.article-description {
+    color: #b0b0b0;
+    margin-bottom: 1.2rem;
+    line-height: 1.6;
+}
+
+.article-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    color: #888;
+    padding-top: 1rem;
+    border-top: 1px solid #444;
+}
+
+.article-link {
+    color: #4ecdc4;
+    text-decoration: none;
+    font-weight: bold;
+    padding: 0.5rem 1rem;
+    background: rgba(78, 205, 196, 0.1);
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.article-link:hover {
+    background: rgba(78, 205, 196, 0.2);
+    color: #6effff;
+}
+
+/* Loading Spinner */
+.loading {
+    text-align: center;
+    padding: 3rem;
+}
+
+.spinner {
+    border: 4px solid #333;
+    border-top: 4px solid #4ecdc4;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Admin Panel */
+.admin-panel {
+    position: fixed;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    background: linear-gradient(135deg, #2d2d2d, #3d3d3d);
+    border: 1px solid #444;
+    border-radius: 15px 0 0 15px;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+    z-index: 1000;
+}
+
+.admin-toggle {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+    border: none;
+    padding: 1rem 0.5rem;
+    border-radius: 5px 0 0 5px;
+    cursor: pointer;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.admin-toggle:hover {
+    background: linear-gradient(135deg, #c0392b, #a93226);
+}
+
+.admin-content {
+    padding: 1.5rem;
+    min-width: 320px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.admin-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    margin-bottom: 1.5rem;
+}
+
+.btn {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    border: none;
+    padding: 0.8rem 1.2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    text-align: center;
+}
+
+.btn:hover {
+    background: linear-gradient(135deg, #2980b9, #1f618d);
+    transform: translateY(-2px);
+}
+
+/* Footer */
+footer {
+    background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+    color: #b0b0b0;
+    text-align: center;
+    padding: 2rem 0;
+    margin-top: 3rem;
+    border-top: 1px solid #333;
+}
+
+.admin-btn {
+    background: transparent;
+    color: #4ecdc4;
+    border: 1px solid #4ecdc4;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 1rem;
+    transition: all 0.3s ease;
+}
+
+.admin-btn:hover {
+    background: rgba(78, 205, 196, 0.1);
+    color: #6effff;
+}
+
+/* Form Styles */
+input, select, textarea {
+    background: #2d2d2d;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 0.7rem;
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #4ecdc4;
+    box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.2);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #4ecdc4;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #6effff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .countries-grid {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 1rem;
+    }
+    
+    .news-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .admin-panel {
+        position: relative;
+        transform: none;
+        border-radius: 10px;
+        margin: 1rem;
+        width: calc(100% - 2rem);
+    }
+    
+    .admin-toggle {
+        writing-mode: horizontal-tb;
+        padding: 0.8rem;
+    }
+    
+    .article-meta {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: start;
+    }
+}
