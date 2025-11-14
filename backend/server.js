@@ -15,7 +15,10 @@ const io = socketIo(server, {
   }
 });
 
-app.use(cors());
+app.use(cors({
+    origin: ['https://targetednews.netlify.app', 'http://localhost:3000'],
+    credentials: true
+}));
 app.use(express.json());
 
 // Initialize RSS Parser
