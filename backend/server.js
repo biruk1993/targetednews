@@ -18,7 +18,7 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 
-// Initialize RSS Parser
+// Initialize RSS Parser (keeping for backup)
 const parser = new Parser();
 
 // Database setup - FIXED PATH
@@ -140,27 +140,14 @@ function autoInitializeSources() {
   });
 }
 
-// Initialize default RSS sources
+// Initialize default sources (minimal - just for admin panel)
 function initializeDefaultSources() {
   const workingSources = [
-    // Eritrea
-    { country_code: 'eritrea', rss_url: 'http://www.shabait.com/feed', source_name: 'Shabait Eritrea' },
-    { country_code: 'eritrea', rss_url: 'https://allafrica.com/tools/headlines/rdf/eritrea/headlines.rdf', source_name: 'AllAfrica Eritrea' },
-    
-    // Somalia
-    { country_code: 'somalia', rss_url: 'https://allafrica.com/tools/headlines/rdf/somalia/headlines.rdf', source_name: 'AllAfrica Somalia' },
-    
-    // Sudan
-    { country_code: 'sudan', rss_url: 'https://allafrica.com/tools/headlines/rdf/sudan/headlines.rdf', source_name: 'AllAfrica Sudan' },
-    { country_code: 'sudan', rss_url: 'https://sudanow-magazine.net/feed', source_name: 'Sudanow Magazine' },
-    
-    // Kenya
-    { country_code: 'kenya', rss_url: 'https://allafrica.com/tools/headlines/rdf/kenya/headlines.rdf', source_name: 'AllAfrica Kenya' },
-    { country_code: 'kenya', rss_url: 'https://www.the-star.co.ke/rss', source_name: 'The Star Kenya' },
-    
-    // Egypt
-    { country_code: 'egypt', rss_url: 'https://allafrica.com/tools/headlines/rdf/egypt/headlines.rdf', source_name: 'AllAfrica Egypt' },
-    { country_code: 'egypt', rss_url: 'https://www.dailynewsegypt.com/feed/', source_name: 'Daily News Egypt' }
+    { country_code: 'eritrea', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Eritrea' },
+    { country_code: 'somalia', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Somalia' },
+    { country_code: 'sudan', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Sudan' },
+    { country_code: 'kenya', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Kenya' },
+    { country_code: 'egypt', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Egypt' }
   ];
 
   let added = 0;
@@ -178,10 +165,10 @@ function initializeDefaultSources() {
         
         // Auto-fetch news after adding all sources
         if (index === workingSources.length - 1) {
-          console.log(`🎉 Auto-initialized ${added} RSS sources`);
+          console.log(`🎉 Auto-initialized ${added} sources`);
           // Auto-fetch news after 10 seconds
           setTimeout(() => {
-            console.log('🔄 Auto-fetching news after source initialization...');
+            console.log('🔄 Auto-fetching news from NewsAPI...');
             NewsFetcher.fetchAllNews();
           }, 10000);
         }
@@ -190,50 +177,35 @@ function initializeDefaultSources() {
   });
 }
 
-// News Fetcher Service
+// News Fetcher Service with NewsAPI
 class NewsFetcher {
   static async fetchAllNews() {
     try {
-      console.log('📡 Starting news fetch from all sources...');
+      console.log('📡 Starting news fetch from NewsAPI...');
       
-      // Get all active sources
-      const sources = await new Promise((resolve, reject) => {
-        db.all(
-          `SELECT ns.*, c.name as country_name 
-           FROM news_sources ns 
-           JOIN countries c ON ns.country_code = c.code 
-           WHERE ns.is_active = 1`,
-          (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows);
-          }
-        );
-      });
+      const countries = {
+        eritrea: 'er',
+        somalia: 'so', 
+        sudan: 'sd',
+        kenya: 'ke',
+        egypt: 'eg'
+      };
 
       let totalArticles = 0;
 
-      for (const source of sources) {
+      for (const [countryCode, newsApiCode] of Object.entries(countries)) {
         try {
-          console.log(`🔍 Fetching from: ${source.source_name} (${source.country_code})`);
+          console.log(`🔍 Fetching news for: ${countryCode}`);
           
-          const feed = await parser.parseURL(source.rss_url);
-          console.log(`✅ Found ${feed.items.length} articles from ${source.source_name}`);
-          
-          const articles = feed.items.map(item => ({
-            source_id: source.id,
-            country_code: source.country_code,
-            title: item.title || 'No title',
-            description: item.description || item.content || item['content:encoded'] || '',
-            link: item.link || '',
-            pub_date: item.pubDate || item.isoDate || new Date()
-          }));
-
-          // Save articles to database
+          // Use NewsAPI instead of RSS
+          const articles = await this.fetchFromNewsAPI(newsApiCode, countryCode);
           await this.saveArticles(articles);
           totalArticles += articles.length;
           
+          console.log(`✅ Found ${articles.length} articles for ${countryCode}`);
+          
         } catch (error) {
-          console.log(`❌ Failed to fetch from ${source.source_name}:`, error.message);
+          console.log(`❌ Failed to fetch for ${countryCode}:`, error.message);
         }
       }
 
@@ -243,6 +215,34 @@ class NewsFetcher {
     } catch (error) {
       console.error('Error in fetchAllNews:', error);
       return 0;
+    }
+  }
+
+  static async fetchFromNewsAPI(countryCode, countryName) {
+    const NEWS_API_KEY = '29ceab457b534b79a5732233a6b95fcd'; // Your API key
+    const url = `https://newsapi.org/v2/top-headlines?country=${countryCode}&pageSize=15&apiKey=${NEWS_API_KEY}`;
+    
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status === 'ok' && data.articles && data.articles.length > 0) {
+        return data.articles.map(article => ({
+          source_id: 1, // Default source ID
+          country_code: countryName,
+          title: article.title || 'No title available',
+          description: article.description || 'No description available',
+          link: article.url || '',
+          pub_date: article.publishedAt || new Date(),
+          source_name: article.source?.name || 'NewsAPI'
+        }));
+      } else {
+        console.log(`No articles found for ${countryCode} or API error`);
+        return [];
+      }
+    } catch (error) {
+      console.log(`NewsAPI error for ${countryCode}:`, error.message);
+      return [];
     }
   }
 
@@ -267,7 +267,7 @@ class NewsFetcher {
           article.source_id,
           article.country_code,
           article.title ? article.title.substring(0, 500) : 'No title',
-          article.description ? article.description.substring(0, 1000) : '',
+          article.description ? article.description.substring(0, 1000) : 'No description',
           article.link,
           article.pub_date
         ], (err) => {
@@ -307,7 +307,7 @@ class NewsFetcher {
   }
 }
 
-// Auto-refresh news every 10 minutes
+// Auto-refresh news every 30 minutes (NewsAPI has 100 requests/day limit)
 const AutoRefresh = {
   start() {
     // Initial fetch after 30 seconds (let auto-init complete first)
@@ -315,15 +315,15 @@ const AutoRefresh = {
       this.fetchAllNews();
     }, 30000);
     
-    // Then fetch every 10 minutes
+    // Then fetch every 30 minutes to stay within free limits
     setInterval(() => {
       this.fetchAllNews();
-    }, 10 * 60 * 1000);
+    }, 30 * 60 * 1000);
   },
   
   async fetchAllNews() {
     try {
-      console.log('🔄 Auto-refreshing news...');
+      console.log('🔄 Auto-refreshing news from NewsAPI...');
       const count = await NewsFetcher.fetchAllNews();
       
       // Notify all connected clients
@@ -347,6 +347,7 @@ app.get('/', (req, res) => {
   res.json({ 
     message: '🎯 TargetedNews API is running!',
     developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe',
+    news_source: 'NewsAPI - Reliable news data',
     endpoints: {
       countries: '/api/countries',
       news: '/api/news/:countryCode',
@@ -385,27 +386,14 @@ app.get('/api/countries-with-news', (req, res) => {
   });
 });
 
-// Initialize RSS sources (run this once)
+// Initialize RSS sources (for admin panel)
 app.get('/api/init-sources', (req, res) => {
   const workingSources = [
-    // Eritrea
-    { country_code: 'eritrea', rss_url: 'http://www.shabait.com/feed', source_name: 'Shabait Eritrea' },
-    { country_code: 'eritrea', rss_url: 'https://allafrica.com/tools/headlines/rdf/eritrea/headlines.rdf', source_name: 'AllAfrica Eritrea' },
-    
-    // Somalia
-    { country_code: 'somalia', rss_url: 'https://allafrica.com/tools/headlines/rdf/somalia/headlines.rdf', source_name: 'AllAfrica Somalia' },
-    
-    // Sudan
-    { country_code: 'sudan', rss_url: 'https://allafrica.com/tools/headlines/rdf/sudan/headlines.rdf', source_name: 'AllAfrica Sudan' },
-    { country_code: 'sudan', rss_url: 'https://sudanow-magazine.net/feed', source_name: 'Sudanow Magazine' },
-    
-    // Kenya
-    { country_code: 'kenya', rss_url: 'https://allafrica.com/tools/headlines/rdf/kenya/headlines.rdf', source_name: 'AllAfrica Kenya' },
-    { country_code: 'kenya', rss_url: 'https://www.the-star.co.ke/rss', source_name: 'The Star Kenya' },
-    
-    // Egypt
-    { country_code: 'egypt', rss_url: 'https://allafrica.com/tools/headlines/rdf/egypt/headlines.rdf', source_name: 'AllAfrica Egypt' },
-    { country_code: 'egypt', rss_url: 'https://www.dailynewsegypt.com/feed/', source_name: 'Daily News Egypt' }
+    { country_code: 'eritrea', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Eritrea' },
+    { country_code: 'somalia', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Somalia' },
+    { country_code: 'sudan', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Sudan' },
+    { country_code: 'kenya', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Kenya' },
+    { country_code: 'egypt', rss_url: 'https://newsapi.org', source_name: 'NewsAPI - Egypt' }
   ];
 
   let added = 0;
@@ -446,7 +434,7 @@ app.get('/api/fetch-news', async (req, res) => {
     const count = await NewsFetcher.fetchAllNews();
     res.json({
       success: true,
-      message: `Successfully processed ${count} articles`,
+      message: `Successfully processed ${count} articles from NewsAPI`,
       count: count,
       developer: 'powerd by Ethiopian electronic warfare department by developer second lieutenant biruk zenebe'
     });
@@ -575,6 +563,7 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 TargetedNews Backend Active!`);
+  console.log(`📰 Using NewsAPI for reliable news data`);
   console.log(`👨‍💻 Developer: Second Lieutenant Biruk Zenebe`);
   console.log(`🏢 Ethiopian Electronic Warfare Department`);
 });
