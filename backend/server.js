@@ -15,10 +15,7 @@ const io = socketIo(server, {
   }
 });
 
-app.use(cors({
-    origin: ['https://targetednews.netlify.app', 'http://localhost:3000'],
-    credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 
 // Initialize RSS Parser
@@ -275,7 +272,8 @@ app.get('/', (req, res) => {
       countries: '/api/countries',
       news: '/api/news/:countryCode',
       fetchNews: '/api/fetch-news',
-      admin_sources: '/admin/sources'
+      admin_sources: '/admin/sources',
+      init_sources: '/api/init-sources'
     }
   });
 });
@@ -305,6 +303,60 @@ app.get('/api/countries-with-news', (req, res) => {
       return;
     }
     res.json(rows);
+  });
+});
+
+// Initialize RSS sources (run this once)
+app.get('/api/init-sources', (req, res) => {
+  const workingSources = [
+    // Eritrea
+    { country_code: 'eritrea', rss_url: 'http://www.shabait.com/feed', source_name: 'Shabait Eritrea' },
+    { country_code: 'eritrea', rss_url: 'https://allafrica.com/tools/headlines/rdf/eritrea/headlines.rdf', source_name: 'AllAfrica Eritrea' },
+    
+    // Somalia
+    { country_code: 'somalia', rss_url: 'https://allafrica.com/tools/headlines/rdf/somalia/headlines.rdf', source_name: 'AllAfrica Somalia' },
+    
+    // Sudan
+    { country_code: 'sudan', rss_url: 'https://allafrica.com/tools/headlines/rdf/sudan/headlines.rdf', source_name: 'AllAfrica Sudan' },
+    { country_code: 'sudan', rss_url: 'https://sudanow-magazine.net/feed', source_name: 'Sudanow Magazine' },
+    
+    // Kenya
+    { country_code: 'kenya', rss_url: 'https://allafrica.com/tools/headlines/rdf/kenya/headlines.rdf', source_name: 'AllAfrica Kenya' },
+    { country_code: 'kenya', rss_url: 'https://www.the-star.co.ke/rss', source_name: 'The Star Kenya' },
+    
+    // Egypt
+    { country_code: 'egypt', rss_url: 'https://allafrica.com/tools/headlines/rdf/egypt/headlines.rdf', source_name: 'AllAfrica Egypt' },
+    { country_code: 'egypt', rss_url: 'https://www.dailynewsegypt.com/feed/', source_name: 'Daily News Egypt' }
+  ];
+
+  let added = 0;
+  let errors = 0;
+
+  // Add each source
+  workingSources.forEach((source, index) => {
+    db.run(
+      `INSERT OR IGNORE INTO news_sources (country_code, rss_url, source_name) VALUES (?, ?, ?)`,
+      [source.country_code, source.rss_url, source.source_name],
+      function(err) {
+        if (err) {
+          console.error(`Failed: ${source.source_name} - ${err.message}`);
+          errors++;
+        } else {
+          console.log(`Added: ${source.source_name}`);
+          added++;
+        }
+        
+        // When all sources are processed
+        if (index === workingSources.length - 1) {
+          res.json({
+            success: true,
+            message: `Added ${added} sources, ${errors} errors`,
+            added: added,
+            errors: errors
+          });
+        }
+      }
+    );
   });
 });
 
@@ -437,7 +489,7 @@ app.delete('/admin/sources/:sourceId', (req, res) => {
 // Start server
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 TargetedNews Backend Active!`);
 });
 
